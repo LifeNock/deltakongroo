@@ -1,0 +1,231 @@
+<!DOCTYPE html><html lang="en-us"><head><meta charset="utf-8" /><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0" /><title>DELTARUNE</title><base href="https://cdn.jsdelivr.net/gh/LifeNock/deltakongroo@main/" /><link rel="icon" href="data:," /><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+html{background:#000}
+body{font-family:'Courier New',ui-monospace,monospace;margin:0;padding:0;min-height:100vh;min-width:100vw;background:#000;display:flex;flex-direction:column;overflow-x:hidden;place-items:center;color:#fff}
+body.scrollingDisabled{overflow:hidden}
+canvas.emscripten{display:none;background:#000;transition:opacity 1.5s ease-in;opacity:0;image-rendering:pixelated}
+canvas.active{opacity:1}
+#boot{position:fixed;inset:0;z-index:9000;display:none;flex-direction:column;justify-content:center;align-items:center;background:#000;color:#fff;transition:opacity .6s ease}
+#boot.on{display:flex}#boot.hide{opacity:0;pointer-events:none}
+#boot .track{width:min(340px,68vw);height:6px;background:#161616;border:1px solid #2a2a2a}
+#boot .fill{height:100%;width:0;background:#fff;transition:width .2s linear}
+#boot .msg{margin-top:14px;font-size:12px;letter-spacing:.08em;color:#bdbdbd;min-height:16px}
+#pause{position:fixed;inset:0;z-index:99999;display:none;justify-content:center;align-items:center;background:rgba(0,0,0,.5)}
+#pause.on{display:flex}#pause .p-box{background:#111;border:1px solid #666;color:#fff;padding:26px 40px;text-align:center}
+#pause #pResume{margin-top:18px;font:600 14px monospace;color:#000;background:#ddd;border:none;padding:9px 30px;cursor:pointer}
+#menu{position:fixed;inset:0;z-index:99998;display:none;flex-direction:column;gap:10px;box-sizing:border-box;padding:16px;background:rgba(0,0,0,.5);color:#fff;font:13px/1.45 monospace}
+#menu.on{display:flex}#menu .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#menu .spacer{margin-left:auto}
+#menu button{font:12px monospace;color:#fff;background:transparent;border:1px solid #fff;padding:5px 14px;cursor:pointer}#menu button:hover{background:#fff;color:#000}
+#menu input[type=range]{width:260px;max-width:55vw;accent-color:#fff;filter:grayscale(1)}
+#menu input[type=number]{width:62px;background:#000;color:#fff;border:1px solid #fff;font:13px monospace;padding:3px 5px}
+#menu #dbg{flex:1;min-height:0;overflow:auto;background:rgba(0,0,0,.45);border:1px solid #555;padding:6px 9px;white-space:pre-wrap;font:11px/1.45 ui-monospace,monospace;color:#d6d6d6}
+#menu #dbg .e{color:#ff9b9b}
+#ovl{position:fixed;left:0;right:0;bottom:0;z-index:9600;display:none;align-items:flex-end;justify-content:flex-end;gap:14px;padding:14px 20px;box-sizing:border-box;pointer-events:none;font-family:'Pixelify Sans','Courier New',monospace}
+#ovl.on{display:flex}
+#ovl #impBtn{pointer-events:auto;background:transparent;color:#fff;border:2px solid #fff;font-family:inherit;font-weight:500;font-size:18px;letter-spacing:.06em;padding:7px 18px;cursor:pointer;text-shadow:0 0 6px #000;box-shadow:0 0 8px rgba(0,0,0,.7)}
+#ovl #impBtn:hover{background:#fff;color:#000}
+#impFile{display:none}
+</style></head>
+<body>
+<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+<div id="ovl"><button id="impBtn">[ Import Save ]</button></div>
+<input id="impFile" type="file" multiple />
+<div id="boot"><div class="track"><div class="fill" id="bootFill"></div></div><div class="msg" id="bootMsg">Loading...</div></div>
+<div id="pause"><div class="p-box"><div>Paused</div><button id="pResume">Resume</button></div></div>
+<div id="menu"><div class="row"><span>deltarune log</span><span class="spacer"></span><button id="mResume">resume</button></div><div class="row"><span>speed</span><input type="range" id="spd" min="0.25" max="10" step="0.05" value="1" /><input type="number" id="spdv" min="0.25" max="10" step="0.05" value="1" /><button id="spdReset">reset</button><span class="spacer">press ` to close</span></div><div class="row"><button id="dbgSave">save log</button><button id="dbgClear">clear</button></div><div id="dbg"></div></div>
+
+<script>
+var DBG = (function () {
+  var el = document.getElementById("dbg"), raw = [], html = [];
+  function stamp(){try{return new Date().toISOString().substr(11,12);}catch(e){return"";}}
+  function push(t,err){var line=stamp()+" "+String(t);raw.push((err?"[ERR] ":"      ")+line);html.push((err?"<span class='e'>":"<span>")+line.replace(/[<>]/g,"")+"</span>");if(raw.length>4000){raw.shift();html.shift();}el.innerHTML=html.join("\n");el.scrollTop=1e9;}
+  function save(){var b=new Blob([raw.join("\n")+"\n"],{type:"text/plain"});var u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="deltarune-debug.txt";document.body.appendChild(a);a.click();setTimeout(function(){a.remove();URL.revokeObjectURL(u);},1000);}
+  document.addEventListener("keydown",function(e){if(e.key==="`"){if(window.__menuToggle)window.__menuToggle();}});
+  document.getElementById("dbgSave").addEventListener("click",save);
+  document.getElementById("dbgClear").addEventListener("click",function(){raw=[];html=[];el.innerHTML="";});
+  return {log:function(t){push(t,false);},err:function(t){push(t,true);},save:save};
+})();
+window.addEventListener("error",function(e){DBG.err("JS error: "+e.message);});
+window.addEventListener("unhandledrejection",function(e){DBG.err("reject: "+(e.reason&&e.reason.message||e.reason));});
+
+window.__np = 1;
+var CH = "", MUS = [], SND = [], MANIFEST = { chapters: [], mus: [], snd: {}, lang: {}, parts: {} };
+var gameUnxBlobUrl = null, seen = {};
+function mark(name){if(!seen[name]){seen[name]=1;DBG.log("[req] "+name);}}
+
+(function(){var realRAF=window.requestAnimationFrame.bind(window);var speed=1,loopFn=null,current=null,pending=false,acc=0,_sp=false;
+  window.__setGameSpeed=function(s){s=Number(s);if(!isFinite(s)||s<=0)s=1;speed=Math.max(0.25,Math.min(10,s));};
+  window.__getGameSpeed=function(){return speed;};window.__spPause=function(){_sp=true;};window.__spResume=function(){_sp=false;if(!pending){pending=true;realRAF(drive);}};
+  window.requestAnimationFrame=function(cb){if(cb===loopFn||cb===current){loopFn=cb;if(!pending){pending=true;realRAF(drive);}return 0;}return realRAF(function(ts){current=cb;try{cb(ts);}catch(e){}current=null;});};
+  function drive(ts){pending=false;if(!loopFn||_sp)return;acc+=speed;var n=Math.floor(acc);acc-=n;if(n>120)n=120;for(var i=0;i<n;i++){current=loopFn;try{loopFn(ts);}catch(e){}current=null;}if(n===0&&!pending){pending=true;realRAF(drive);}}
+})();
+
+function fixUrl(u){
+  if(!u||typeof u!=="string")return null;
+  if(u.startsWith("data:")||u.startsWith("blob:"))return null;
+  if(u.indexOf("home.html")!==-1)return "data:text/plain,";
+  if(/game\.unx(?!\.part)/.test(u))return gameUnxBlobUrl||null;
+  var p=u; if(u.indexOf("://")!==-1){try{p=new URL(u).pathname;}catch(e){return null;}}
+  var mi=p.lastIndexOf("mus/"); if(mi!==-1){var mf=p.slice(mi+4).replace(/^\/+/,"");if(mf){mark("mus/"+mf);return "mus/"+mf;}}
+  var vi=p.lastIndexOf("vid/"); if(vi!==-1){var vf=p.slice(vi+4).replace(/^\/+/,"");if(vf){mark("vid/"+vf);return CH+"vid/"+vf;}}
+  var li=p.lastIndexOf("lang/"); if(li!==-1){var lf=p.slice(li+5).replace(/^\/+/,"");if(lf&&/\.json$/.test(lf)){mark("lang/"+lf);return CH+"lang/"+lf;}}
+  var base=p.split("/").pop().split("?")[0]; if(!base)return null;
+  if(/^snd_.*\.(ogg|wav|mp3)$/i.test(base)||base==="AUDIO_INTRONOISE.ogg"||/^mus_.*\.ogg$/i.test(base)){mark(base);return CH+base;}
+  if(base==="audiogroup1.dat"){mark(base);return CH+base;}
+  if(base==="runner.wasm"||base==="runner.data"||base==="audio-worklet.js"||base==="runner.js")return base;
+  return null;
+}
+var _fetch=window.fetch;
+window.fetch=function(res,opts){var u=typeof res==="string"?res:(res&&res.url)||"";var f=fixUrl(u);if(f!==null){return _fetch(f,opts);}return _fetch.apply(this,arguments);};
+var _open=XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open=function(m,url,a,us,p){var f=fixUrl(url);if(f!==null){url=f;}return _open.call(this,m,url,a,us,p);};
+try{var mp=HTMLMediaElement.prototype,d=Object.getOwnPropertyDescriptor(mp,"src");if(d&&d.set)Object.defineProperty(mp,"src",{configurable:true,enumerable:d.enumerable,get:d.get,set:function(v){var f=fixUrl(v);d.set.call(this,f!==null?f:v);}});}catch(e){}
+if(window.AudioWorklet&&AudioWorklet.prototype.addModule){var _am=AudioWorklet.prototype.addModule;AudioWorklet.prototype.addModule=function(u,o){if(typeof u==="string"&&u.indexOf("audio-worklet.js")!==-1)u="audio-worklet.js";return _am.call(this,u,o);};}
+window.__ctxs=[];["AudioContext","webkitAudioContext"].forEach(function(n){var C=window[n];if(!C)return;window[n]=function(){var c=arguments.length?new C(arguments[0]):new C();window.__ctxs.push(c);return c;};window[n].prototype=C.prototype;});
+window.__CH5={setBlob:function(b){gameUnxBlobUrl=b;}};
+
+var canvasElement=document.getElementById("canvas");
+var bootEl=document.getElementById("boot"),bootFill=document.getElementById("bootFill"),bootMsg=document.getElementById("bootMsg");
+var startingHeight,startingWidth,startingAspect,_bootHidden=false;
+function setBar(p){bootFill.style.width=Math.max(0,Math.min(100,p))+"%";}
+function setMsg(t){if(bootMsg)bootMsg.textContent=t;}
+function hideBoot(){if(_bootHidden)return;_bootHidden=true;bootEl.classList.add("hide");setTimeout(function(){bootEl.style.display="none";},650);}
+
+function setupLazyAudio(){
+  var lazy=Module.FS_createLazyFile,mkpath=Module.FS_createPath;
+  if(!lazy||!mkpath){DBG.err("FS lazy API missing");return;}
+  function ensure(par,nm){try{mkpath(par,nm,true,true);}catch(e){}}
+  ensure("/","assets");ensure("/","mus");ensure("/assets","mus");
+  var n=0,i,name;
+  for(i=0;i<MUS.length;i++){name=MUS[i];try{lazy("/mus",name,"mus/"+name,true,false);n++;}catch(e){}try{lazy("/assets/mus",name,"mus/"+name,true,false);}catch(e){}}
+  for(i=0;i<SND.length;i++){name=SND[i];try{lazy("/",name,CH+name,true,false);n++;}catch(e){}try{lazy("/assets",name,CH+name,true,false);}catch(e){}}
+  DBG.log("lazy audio registered: "+n);
+}
+function overrideChapterFiles(){
+  var mk=Module.FS_createDataFile,rm=Module.FS_unlink,mkp=Module.FS_createPath;
+  if(!mk||!mkp){DBG.err("FS data API missing");return;}
+  function ens(par,nm){try{mkp(par,nm,true,true);}catch(e){}}
+  ens("/","assets");ens("/assets","lang");ens("/","lang");
+  var list=window.__override||[],ok=0;
+  list.forEach(function(o){
+    try{rm(o.dir+"/"+o.name);}catch(e){}
+    try{mk(o.dir,o.name,o.data,true,false,true);ok++;}catch(e){DBG.err("override fail "+o.dir+"/"+o.name+": "+e);}
+  });
+  DBG.log("chapter overrides applied: "+ok+"/"+list.length);
+}
+
+var g_pWadLoadCallback,g_pAddAsyncMethod=-1,g_pJSExceptionHandler;
+function setWadLoadCallback(c){g_pWadLoadCallback=c;}
+function setAddAsyncMethod(m){g_pAddAsyncMethod=m;}
+function setJSExceptionHandler(h){if(typeof h=="function")g_pJSExceptionHandler=h;}
+function hasJSExceptionHandler(){return typeof g_pJSExceptionHandler=="function";}
+function doJSExceptionHandler(j){if(typeof g_pJSExceptionHandler=="function")g_pJSExceptionHandler(JSON.parse(j));}
+function manifestFiles(){return ["runner.data","runner.js","runner.wasm","audio-worklet.js","game.unx"].join(";");}
+function manifestFilesMD5(){return ["","","","",""].join(";");}
+function onFirstFrameRendered(){}
+function onGameSetWindowSize(w,h){if(startingHeight===undefined){startingHeight=h;startingWidth=w;startingAspect=w/h;}}
+function ensureAspectRatio(){if(!canvasElement||startingHeight===undefined)return;canvasElement.classList.add("active");var nw,nh;if((startingHeight/window.innerHeight)>(startingWidth/window.innerWidth)){nh=window.innerHeight;nw=nh*startingAspect;}else{nw=window.innerWidth;nh=nw/startingAspect;}canvasElement.style.height=nh+"px";canvasElement.style.width=nw+"px";}
+function quitIfSupported(){if(window.oprt&&window.oprt.closeTab)window.oprt.closeTab();}
+setWadLoadCallback(function(){});
+
+function refitCanvas(){window.requestAnimationFrame(ensureAspectRatio);setTimeout(function(){window.requestAnimationFrame(ensureAspectRatio);},60);setTimeout(function(){window.requestAnimationFrame(ensureAspectRatio);},250);setTimeout(function(){window.requestAnimationFrame(ensureAspectRatio);},600);}
+new ResizeObserver(refitCanvas).observe(document.body);window.addEventListener("resize",refitCanvas);document.addEventListener("fullscreenchange",refitCanvas);
+if(/Android|iPhone|iPod/i.test(navigator.userAgent))document.body.className="scrollingDisabled";
+var pauseEl=document.getElementById("pause"),_focusPaused=false;
+function focusPause(){if(_focusPaused||!canvasElement.classList.contains("active"))return;_focusPaused=true;try{GM_pause();}catch(e){}if(window.__spPause)window.__spPause();pauseEl.classList.add("on");}
+function focusResume(){if(!_focusPaused)return;_focusPaused=false;try{GM_unpause();}catch(e){}if(window.__spResume)window.__spResume();pauseEl.classList.remove("on");}
+document.addEventListener("visibilitychange",function(){if(document.visibilityState!=="visible")focusPause();});
+window.addEventListener("blur",focusPause);document.getElementById("pResume").addEventListener("click",focusResume);
+var menuEl=document.getElementById("menu");
+window.__menuToggle=function(force){var open=(typeof force==="boolean")?force:!menuEl.classList.contains("on");menuEl.classList.toggle("on",open);};
+(function(){var spd=document.getElementById("spd"),spdv=document.getElementById("spdv");function apply(v){v=Number(v);if(!isFinite(v)||v<=0)v=1;v=Math.max(0.25,Math.min(10,v));spd.value=v;spdv.value=v;if(window.__setGameSpeed)window.__setGameSpeed(v);}spd.addEventListener("input",function(){apply(spd.value);});spdv.addEventListener("input",function(){apply(spdv.value);});[spd,spdv].forEach(function(el){el.addEventListener("keydown",function(e){e.stopPropagation();});});document.getElementById("spdReset").addEventListener("click",function(){apply(1);});document.getElementById("mResume").addEventListener("click",function(){window.__menuToggle(false);});})();
+
+function bootChapter(n){
+  var isL=(n==="launcher");
+  CH=isL?"":("chapters/ch"+n+"/");
+  var gameBase=isL?"launcher.unx":(CH+"game.unx");
+  var partKey=isL?"launcher":String(n);
+  var parts=(MANIFEST.parts&&MANIFEST.parts[partKey])||0;
+  MUS=(MANIFEST.mus||[]).slice();
+  SND=isL?[]:(MANIFEST.snd&&MANIFEST.snd[n]||[]).slice();
+  DBG.log("booting "+(isL?"launcher":("chapter "+n))+" (mus="+MUS.length+" snd="+SND.length+" parts="+parts+")");
+  var ovl=document.getElementById("ovl");if(ovl){if(isL)ovl.classList.add("on");else ovl.classList.remove("on");}
+  bootEl.classList.add("on");
+  setMsg(isL?"Downloading launcher...":("Downloading chapter "+n+" data..."));setBar(4);
+  window.Module={
+    preRun:[setupLazyAudio],postRun:[],onRuntimeInitialized:function(){overrideChapterFiles();},
+    locateFile:function(p){return p;},
+    print:function(text){
+      var wl=text.indexOf("WEBLAUNCH:");
+      if(!window.__relaunching&&wl!==-1){var ch=parseInt(text.slice(wl+10),10);if(ch>=1&&ch<=5){window.__relaunching=true;location.href=location.pathname+"?chapter="+ch;return;}}
+      if(!window.__relaunching&&text.indexOf("###game_end###")!==-1){window.__relaunching=true;location.href=location.pathname;return;}
+      if(window.__relaunching)return;
+      DBG.log(text);
+      if(text==="Entering main loop."){canvasElement.style.display="block";ensureAspectRatio();canvas.width=1280;canvas.height=960;hideBoot();}
+    },
+    printErr:function(text){DBG.err(text);},
+    canvas:canvasElement,
+    setStatus:function(text){if(!text)return;var m=text.match(/\((\d+(\.\d+)?)\/(\d+)\)/);if(m)setBar(parseInt(m[1])/parseInt(m[3])*100);setMsg(text);},
+    totalDependencies:0,
+    monitorRunDependencies:function(left){this.totalDependencies=Math.max(this.totalDependencies,left);Module.setStatus(left?"Preparing... ("+(this.totalDependencies-left)+"/"+this.totalDependencies+")":"Starting game...");},
+    arguments:[]
+  };
+  var unlocked=false;function unlockAudio(){if(unlocked)return;unlocked=true;(window.__ctxs||[]).forEach(function(c){try{c.resume();}catch(e){}});}
+  window.addEventListener("keydown",unlockAudio);window.addEventListener("pointerdown",unlockAudio);
+  window.__override=[];
+  var overrideSpec=[];
+  if(!isL){
+    var langs=(MANIFEST.lang&&MANIFEST.lang[n])||[];
+    langs.forEach(function(lf){
+      overrideSpec.push({url:CH+"lang/"+lf,dir:"/assets/lang",name:lf});
+      overrideSpec.push({url:CH+"lang/"+lf,dir:"/lang",name:lf});
+    });
+    overrideSpec.push({url:CH+"audiogroup1.dat",dir:"/assets",name:"audiogroup1.dat"});
+  }
+  function fetchOverride(o){return _fetch(o.url).then(function(r){return r.ok?r.arrayBuffer():null;}).then(function(buf){if(buf)window.__override.push({dir:o.dir,name:o.name,data:new Uint8Array(buf)});}).catch(function(){});}
+  var gameP;
+  if(parts>0){
+    var purls=[];for(var pi=1;pi<=parts;pi++)purls.push(gameBase+".part"+pi);
+    var pdone=0;
+    gameP=Promise.all(purls.map(function(u){return _fetch(u).then(function(r){if(!r.ok)throw new Error("part "+r.status);return r.arrayBuffer();}).then(function(b){pdone++;setBar(4+(pdone/parts)*86);return b;});}));
+  }else{
+    gameP=_fetch(gameBase).then(function(r){if(!r.ok)throw new Error("game "+r.status);return r.arrayBuffer();}).then(function(b){return [b];});
+  }
+  Promise.all([gameP].concat(overrideSpec.map(fetchOverride))).then(function(res){
+    DBG.log("chapter overrides fetched: "+window.__override.length);
+    window.__CH5.setBlob(URL.createObjectURL(new Blob(res[0])));
+    setMsg("Starting game...");setBar(100);
+    setTimeout(function(){DBG.log("loading runner");var s=document.createElement("script");s.async=true;s.src="runner.js";document.body.appendChild(s);},150);
+  }).catch(function(err){DBG.err("game data load failed: "+err.message);setMsg("Failed to load - press ` for log");});
+}
+
+function importSaves(files){
+  var arr=Array.prototype.slice.call(files);
+  if(!arr.length)return;
+  DBG.log("importing "+arr.length+" save file(s)");
+  Promise.all(arr.map(function(f){return f.arrayBuffer().then(function(buf){return {name:f.name,data:new Int8Array(buf)};});})).then(function(items){
+    var req=indexedDB.open("/_savedata");
+    req.onsuccess=function(){
+      var db=req.result;
+      if(!db.objectStoreNames.contains("FILE_DATA")){db.close();alert("Save storage is not ready yet. Let a chapter load once, then import.");return;}
+      var tx=db.transaction("FILE_DATA","readwrite"),os=tx.objectStore("FILE_DATA"),now=new Date();
+      items.forEach(function(it){os.put({timestamp:now,mode:33206,contents:it.data},"/_savedata/"+it.name);});
+      tx.oncomplete=function(){db.close();DBG.log("import wrote "+items.length+" file(s)");impFileReset();if(confirm("Imported "+items.length+" save file(s). Reload to apply them?"))location.href=location.pathname;};
+      tx.onerror=function(){db.close();alert("Import failed while writing to storage.");};
+    };
+    req.onerror=function(){alert("Could not open save storage.");};
+  }).catch(function(e){DBG.err("import "+e);alert("Import error: "+e);});
+}
+function impFileReset(){var el=document.getElementById("impFile");if(el)el.value="";}
+(function(){var b=document.getElementById("impBtn"),f=document.getElementById("impFile");
+  if(b&&f){b.addEventListener("click",function(){f.click();});f.addEventListener("change",function(){importSaves(f.files);});}
+})();
+
+_fetch("manifest.json").then(function(r){return r.json();}).then(function(mf){
+  MANIFEST=mf;DBG.log("manifest: chapters="+(mf.chapters||[]).join(",")+" mus="+(mf.mus||[]).length);
+  var q=new URLSearchParams(location.search);var c=q.get("chapter");
+  if(c&&c!=="launcher"&&(MANIFEST.chapters||[]).indexOf(parseInt(c,10))!==-1)bootChapter(parseInt(c,10));
+  else bootChapter("launcher");
+}).catch(function(e){DBG.err("manifest load failed: "+e.message);setMsg("manifest failed: "+e.message);});
+</script>
+</body></html>
